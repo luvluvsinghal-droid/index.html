@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fight Game</title>
+
+<style>
+body{
+  font-family:Arial;
+  text-align:center;
+  background:linear-gradient(red,orange,yellow);
+}
+.screen{display:none;}
+.active{display:block;}
+
+#arena{
+  width:320px;
+  height:220px;
+  margin:auto;
+  border:3px solid black;
+  background:#ffcc80;
+  position:relative;
+}
+
+.player{
+  width:40px;
+  height:60px;
+  position:absolute;
+  bottom:10px;
+  font-size:30px;
+}
+
+#p1{left:30px;}
+#p2{right:30px;}
+
+button,select,textarea{
+  padding:6px;
+  margin:5px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>🔥 Fight Game 🔥</h2>
+
+<!-- MAIN LOBBY -->
+<div id="main" class="screen active">
+  <button onclick="show('single')">Single Player</button>
+  <button onclick="show('multi')">Multiplayer</button>
+</div>
+
+<!-- SINGLE PLAYER -->
+<div id="single" class="screen">
+  <p>Practice Mode</p>
+  <button onclick="startSingle()">Start</button>
+</div>
+
+<!-- MULTIPLAYER LOBBY -->
+<div id="multi" class="screen">
+  <select id="char">
+    <option value="🥊,15">Boxer</option>
+    <option value="🔥,25">Fire</option>
+    <option value="⚡,20">Electric</option>
+    <option value="🥷,10">Ninja</option>
+  </select><br>
+
+  <textarea id="offer" placeholder="Offer"></textarea><br>
+  <textarea id="answer" placeholder="Answer"></textarea><br>
+
+  <button onclick="createOffer()">Create Room</button>
+  <button onclick="joinRoom()">Join Room</button>
+  <button onclick="connect()">Connect</button>
+</div>
+
+<!-- GAME -->
+<div id="game" class="screen">
+  <p id="info"></p>
+
+  <div id="arena">
+    <div id="p1" class="player">🙂</div>
+    <div id="p2" class="player">🤖</div>
+  </div>
+
+  <p id="log"></p>
+
+  <button onclick="send('left')">⬅</button>
+  <button onclick="send('right')">➡</button>
+  <button onclick="send('power')">🔥</button>
+</div>
+
+<script>
+/* SCREEN CONTROL */
+function show(id){
+  document.querySelectorAll('.screen')
+    .forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* SINGLE PLAYER */
+function startSingle(){
+  show('game');
+  document.getElementById("info").innerText="Single Player Mode";
+}
+
+/* MULTIPLAYER LOGIC */
+let pc = new RTCPeerConnection({
+  iceServers:[{urls:"stun:stun.l.google.com:19302"}]
+});
+
+let channel;
+let myChar="🙂";
+let myPower=10;
+let enemyX=240;
+
+pc.ondatachannel=e=>{
+  channel=e.channel;
+  channel.onmessage=msg=>handle(msg.data);
+};
+
+function createOffer(){
+  let c=document.getElementById("char").value.split(",");
+  myChar=c[0]; myPower=+c[1];
+
+  channel=pc.createDataChannel("game");
+  channel.onmessage=e=>handle(e.data);
+
+  let offer;
+  pc.createOffer().then(o=>{
+    offer=o;
+    pc.setLocalDescription(o);
+  }).then(()=>{
+    document.getElementById("offer").value=
+      JSON.stringify(offer);
+  });
+}
+
+function joinRoom(){
+  let offer=JSON.parse(
+    document.getElementById("offer").value
+  );
+  pc.setRemoteDescription(offer);
+
+  pc.createAnswer().then(a=>{
+    pc.setLocalDescription(a);
+    document.getElementById("answer").value=
+      JSON.stringify(a);
+  });
+}
+
+function connect(){
+  let answer=JSON.parse(
+    document.getElementById("answer").value
+  );
+  pc.setRemoteDescription(answer);
+  show('game');
+  document.getElementById("p1").innerText=myChar;
+}
+
+/* GAME DATA */
+function send(action){
+  if(channel){
+    channel.send(JSON.stringify({
+      action:action,
+      power:myPower
+    }));
+  }
+}
+
+function handle(data){
+  let d=JSON.parse(data);
+  if(d.action==="left") enemyX-=10;
+  if(d.action==="right") enemyX+=10;
+  if(d.action==="power")
+    document.getElementById("log").innerText=
+      "Hit! -" + d.power + " HP";
+
+  document.getElementById("p2").style.left=
+    enemyX+"px";
+}
+</script>
+
+</body>
+</html>
